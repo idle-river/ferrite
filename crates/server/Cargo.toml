@@ -1,11 +1,12 @@
 [package]
-name = "cli"
+name = "server"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 ferrite-core = { workspace = true }
+tokio = { workspace = true }
 
 [[bin]]
-name = "ferrite-cli"
+name = "ferrited"
 path = "./src/main.rs"

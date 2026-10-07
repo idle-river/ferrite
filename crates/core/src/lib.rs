@@ -1,11 +1,11 @@
-use std::{collections::HashMap, net::TcpListener};
+use std::collections::HashMap;
 
 pub(crate) type Error = Box<dyn std::error::Error>;
 
+pub const PORT_FILE: &str = "/tmp/ferrite.port";
+
 pub struct FerriteKV {
     data: HashMap<String, String>,
-    socket: Option<TcpListener>,
-    port: u16,
 }
 
 impl Default for FerriteKV {
@@ -19,22 +19,7 @@ impl FerriteKV {
     pub fn new() -> Self {
         Self {
             data: HashMap::new(),
-            socket: None,
-            port: 0,
         }
-    }
-
-    // Starts the TCP listener, changing the internal state of the KV store to add the TcpListener
-    pub fn start(&mut self, host: &str) -> Result<(), Error> {
-        let addr = format!("{}:0", host);
-
-        let listener = TcpListener::bind(addr)?;
-        let local_addr = listener.local_addr()?;
-
-        self.socket = Some(listener);
-        self.port = local_addr.port();
-
-        Ok(())
     }
 
     /// Checks if the associated key already exists in the KV store
@@ -69,16 +54,5 @@ mod tests {
         let kv_store = FerriteKV::new();
 
         assert_eq!(kv_store.data, HashMap::new());
-        assert_eq!(kv_store.port, 0);
-        assert!(kv_store.socket.is_none());
-    }
-
-    #[test]
-    fn start_listener() {
-        let mut kv_store = FerriteKV::new();
-        kv_store.start("127.0.0.1").unwrap();
-
-        assert!(kv_store.socket.is_some());
-        assert_ne!(kv_store.port, 0);
     }
 }
