@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 ferrite-core = { workspace = true }
+tokio = { workspace = true }
 
 [[bin]]
 name = "ferrite-cli"

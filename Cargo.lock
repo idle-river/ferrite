@@ -70,6 +70,7 @@ name = "ferrite-cli"
 version = "0.1.0"
 dependencies = [
  "ferrite-core",
+ "tokio",
 ]
 
 [[package]]

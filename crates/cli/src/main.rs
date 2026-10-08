@@ -1,12 +1,13 @@
 use std::{
     fs,
     io::{self, Write},
-    net::TcpStream,
 };
+use tokio::net::TcpStream;
 
-use ferrite_core::PORT_FILE;
+use ferrite_core::{PORT_FILE, Packet, send};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     println!("Reading port from: {}", PORT_FILE);
 
     let port = fs::read_to_string(PORT_FILE)
@@ -16,7 +17,7 @@ fn main() {
 
     let addr = format!("127.0.0.1:{}", port);
 
-    let mut conn = TcpStream::connect(&addr).unwrap();
+    let mut conn = TcpStream::connect(&addr).await.unwrap();
 
     println!("Connected to fer://{}", addr);
 
@@ -30,16 +31,29 @@ fn main() {
         let cmd: Vec<_> = raw_cmd.split_whitespace().collect();
 
         let operand = cmd[0];
-        let _args = &cmd[0..];
+        let args = &cmd[1..];
 
-        match operand.to_lowercase().as_str() {
+        let packet = match operand.to_lowercase().as_str() {
             "exit" => {
                 break;
             }
-            _ => conn.write_all(cmd.join(" ").as_bytes()).unwrap(),
-        }
+            "help" => {
+                println!("GET <key>\nSET <key> <value>\nDEL <key>\nEXISTS <key>");
+                continue;
+            }
+            "get" => Packet::Get(args[0].to_string()),
+            "set" => Packet::Set(args[0].to_string(), args[1].to_string()),
+            _ => {
+                eprintln!(
+                    "{}: command not found\ntype HELP for a list of operands",
+                    operand
+                );
+                continue;
+            }
+        };
+
+        send(&mut conn, &packet).await.unwrap();
     }
 
-    conn.shutdown(std::net::Shutdown::Both).unwrap();
     println!("Exiting...")
 }
