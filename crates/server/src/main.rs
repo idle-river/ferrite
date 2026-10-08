@@ -1,9 +1,6 @@
-use ferrite_core::{FerriteKV, PORT_FILE};
+use ferrite_core::{FerriteKV, PORT_FILE, Packet, read};
 use std::fs;
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
-};
+use tokio::net::{TcpListener, TcpStream};
 
 pub(crate) type Error = Box<dyn std::error::Error>;
 
@@ -41,20 +38,21 @@ async fn main() {
 }
 
 async fn handle_connection(mut stream: TcpStream) -> Result<(), Error> {
-    let mut buf = [0u8; 1024];
-    #[allow(clippy::unused_io_amount)]
-    stream.read(&mut buf).await?;
+    let packet = read(&mut stream).await?;
 
-    loop {
-        let n = stream.read(&mut buf).await?;
-
-        if n == 0 {
-            break;
+    match packet {
+        Packet::Get(key) => {
+            println!("Getting {} from DB", key);
         }
-
-        stream.write_all(&buf[..n]).await?;
-
-        println!("[*] New msg from client: {}", String::from_utf8_lossy(&buf));
+        Packet::Set(key, value) => {
+            println!("Setting {}:{} into DB", key, value);
+        }
+        Packet::Del(key) => {
+            println!("Deleting {} from DB", key);
+        }
+        Packet::Exists(key) => {
+            println!("Checking if {} exists in DB", key);
+        }
     }
 
     Ok(())
