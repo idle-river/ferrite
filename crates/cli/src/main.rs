@@ -38,6 +38,11 @@ async fn main() {
 
         let cmd: Vec<_> = raw_cmd.split_whitespace().collect();
 
+        if cmd.len() < 2 {
+            println!("Failed to parse: less than 2 args");
+            continue;
+        }
+
         let operand = cmd[0];
         let args = &cmd[1..];
 
