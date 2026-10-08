@@ -11,10 +11,29 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
     derive(Debug),
 )]
 pub enum Packet {
+    Ping,
+    Pong,
+    Request(Request),
+    Response(Response),
+}
+
+#[derive(Archive, Deserialize, Serialize, Debug, PartialEq)]
+#[rkyv(compare(PartialEq), derive(Debug))]
+pub enum Request {
     Get(String),
     Set(String, String),
     Del(String),
     Exists(String),
+}
+
+#[derive(Archive, Deserialize, Serialize, Debug, PartialEq)]
+#[rkyv(compare(PartialEq), derive(Debug))]
+pub enum Response {
+    Get(Option<String>),
+    Set(bool),
+    Del(bool),
+    Exists(bool),
+    Error(String),
 }
 
 impl Packet {

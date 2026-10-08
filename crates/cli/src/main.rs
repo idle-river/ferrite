@@ -1,6 +1,6 @@
 use colored::*;
 use ferrite_cli::{Command, command};
-use ferrite_core::{PORT_FILE, Packet, send};
+use ferrite_core::{PORT_FILE, Packet, Request, send};
 use std::{
     fs,
     io::{self, Write},
@@ -54,8 +54,10 @@ async fn main() {
                 print_help();
                 continue;
             }
-            "get" => Packet::Get(args[0].to_string()),
-            "set" => Packet::Set(args[0].to_string(), args[1].to_string()),
+            "get" => Packet::Request(Request::Get(args[0].to_string())),
+            "set" => Packet::Request(Request::Set(args[0].to_string(), args[1].to_string())),
+            "del" => Packet::Request(Request::Del(args[0].to_string())),
+            "exists" => Packet::Request(Request::Exists(args[0].to_string())),
             _ => {
                 eprintln!(
                     "{}: command not found\ntype HELP for a list of operands",

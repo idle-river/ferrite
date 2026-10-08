@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
+const NONE_VALUE: Option<String> = None;
+
 pub struct FerriteKV {
-    data: HashMap<String, String>,
+    data: HashMap<String, Option<String>>,
 }
 
 impl Default for FerriteKV {
@@ -30,14 +32,14 @@ impl FerriteKV {
             return Err("Key already exists".into());
         }
 
-        self.data.insert(key, value);
+        self.data.insert(key, Some(value));
 
         Ok(())
     }
 
-    /// Gets the current value in the KV store, returns an error if the value does not exist
-    pub fn get(&self, key: &str) -> Option<&String> {
-        self.data.get(key)
+    /// Gets the current value in the KV store.
+    pub fn get(&self, key: &str) -> &Option<String> {
+        self.data.get(key).unwrap_or(&NONE_VALUE)
     }
 }
 
