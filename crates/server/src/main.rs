@@ -1,4 +1,6 @@
-use ferrite_core::{FerriteKV, PORT_FILE, Packet, Request, Response, read, send};
+use ferrite_core::{
+    FerriteKV, PORT_FILE, Packet, Request, Response, is_disconnect_error, read, send,
+};
 use std::fs;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -52,33 +54,46 @@ async fn handle_connection(
     mut stream: TcpStream,
     addr: SocketAddr,
 ) -> Result<(), Error> {
-    let packet = read(&mut stream).await?;
+    loop {
+        let packet = match read(&mut stream).await {
+            Ok(packet) => packet,
+            Err(error) => {
+                if is_disconnect_error(&*error) {
+                    println!("[-] Client disconnected: {}", addr);
+                    break;
+                }
 
-    match packet {
-        Packet::Request(p) => match p {
-            Request::Get(key) => {
-                println!("[*] Client ({}) requested {}", addr, &key);
-                let value = {
-                    let store = store.lock().unwrap();
-                    store.get(&key).clone()
-                };
-                let packet = Response::Get(value);
-                send(&mut stream, &Packet::Response(packet)).await?;
+                return Err(error);
             }
-            Request::Set(key, value) => {
-                println!("Setting {}:{} into DB", key, value);
+        };
+
+        match packet {
+            Packet::Request(p) => match p {
+                Request::Get(key) => {
+                    println!("[*] Client ({}) requested {}", addr, &key);
+                    let value = {
+                        let store = store.lock().unwrap();
+                        store.get(&key).clone()
+                    };
+                    let packet = Response::Get(value);
+                    send(&mut stream, &Packet::Response(packet)).await?;
+                }
+                Request::Set(key, value) => {
+                    println!("Setting {}:{} into DB", key, value);
+                }
+                Request::Del(key) => {
+                    println!("Deleting {} from DB", key);
+                }
+                Request::Exists(key) => {
+                    println!("Checking if {} exists in DB", key);
+                }
+            },
+            Packet::Ping => send(&mut stream, &Packet::Pong).await?,
+            Packet::Pong => {}
+            Packet::Response(_) => {
+                eprintln!("[!] Server Packet Sent From {addr}");
+                return Err("Server Packet Sent".into());
             }
-            Request::Del(key) => {
-                println!("Deleting {} from DB", key);
-            }
-            Request::Exists(key) => {
-                println!("Checking if {} exists in DB", key);
-            }
-        },
-        Packet::Ping => send(&mut stream, &Packet::Pong).await?,
-        Packet::Pong => {}
-        Packet::Response(_) => {
-            unreachable!("Should not have been sent");
         }
     }
 

@@ -1,6 +1,6 @@
 use colored::*;
 use ferrite_cli::{Command, command};
-use ferrite_core::{PORT_FILE, Packet, Request, send};
+use ferrite_core::{PORT_FILE, Packet, Request, Response, is_disconnect_error, read, send};
 use std::{
     fs,
     io::{self, Write},
@@ -38,8 +38,7 @@ async fn main() {
 
         let cmd: Vec<_> = raw_cmd.split_whitespace().collect();
 
-        if cmd.len() < 2 {
-            println!("Failed to parse: less than 2 args");
+        if cmd.is_empty() {
             continue;
         }
 
@@ -54,10 +53,13 @@ async fn main() {
                 print_help();
                 continue;
             }
-            "get" => Packet::Request(Request::Get(args[0].to_string())),
-            "set" => Packet::Request(Request::Set(args[0].to_string(), args[1].to_string())),
-            "del" => Packet::Request(Request::Del(args[0].to_string())),
-            "exists" => Packet::Request(Request::Exists(args[0].to_string())),
+            op @ ("get" | "set" | "del" | "exists") => match parse_request(op, args) {
+                Ok(packet) => packet,
+                Err(usage) => {
+                    eprintln!("Usage: {}", usage);
+                    continue;
+                }
+            },
             _ => {
                 eprintln!(
                     "{}: command not found\ntype HELP for a list of operands",
@@ -67,10 +69,75 @@ async fn main() {
             }
         };
 
-        send(&mut conn, &packet).await.unwrap();
+        if let Err(error) = send(&mut conn, &packet).await {
+            eprintln!("Failed to send packet: {}", error);
+            break;
+        }
+
+        let response = match read(&mut conn).await {
+            Ok(response) => response,
+            Err(error) => {
+                if is_disconnect_error(&*error) {
+                    eprintln!("Connection closed by server.");
+                    break;
+                }
+
+                eprintln!("Failed to read response: {}", error);
+                break;
+            }
+        };
+
+        match response {
+            Packet::Response(p) => match p {
+                Response::Get(res) => {
+                    let key = args[0];
+                    match res {
+                        Some(v) => println!("{} = {}", key, v),
+                        None => println!("Key {} not found", key),
+                    }
+                }
+                _ => todo!(),
+            },
+            Packet::Ping => send(&mut conn, &Packet::Pong).await.unwrap(),
+            Packet::Pong => {}
+            Packet::Request(_) => unreachable!("Client packet recieved from server"),
+        }
     }
 
     println!("Exiting...")
+}
+
+fn parse_request(operand: &str, args: &[&str]) -> Result<Packet, &'static str> {
+    match operand {
+        "get" => {
+            if args.len() != 1 {
+                return Err("GET <key>");
+            }
+            Ok(Packet::Request(Request::Get(args[0].to_string())))
+        }
+        "set" => {
+            if args.len() != 2 {
+                return Err("SET <key> <value>");
+            }
+            Ok(Packet::Request(Request::Set(
+                args[0].to_string(),
+                args[1].to_string(),
+            )))
+        }
+        "del" => {
+            if args.len() != 1 {
+                return Err("DEL <key>");
+            }
+            Ok(Packet::Request(Request::Del(args[0].to_string())))
+        }
+        "exists" => {
+            if args.len() != 1 {
+                return Err("EXISTS <key>");
+            }
+            Ok(Packet::Request(Request::Exists(args[0].to_string())))
+        }
+        _ => Err("HELP"),
+    }
 }
 
 fn print_help() {
